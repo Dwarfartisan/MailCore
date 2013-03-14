@@ -31,12 +31,14 @@
 
 #import "CTXlistResult.h"
 
-@implementation CTXlistResult
-{
+@interface CTXlistResult () {
     NSMutableArray *_flags;
 }
 
-@synthesize name, flags = _flags;
+@end
+
+@implementation CTXlistResult
+@synthesize flags=_flags;
 
 - (id)init
 {
