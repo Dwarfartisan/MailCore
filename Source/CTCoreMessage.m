@@ -464,6 +464,14 @@
     return 0;
 }
 
+- (NSString *)gmail_id {
+    return [NSString stringWithCString:myMessage->gm_msgid encoding:NSUTF8StringEncoding];
+}
+
+- (NSString *)gmail_thread_id {
+    return [NSString stringWithCString:myMessage->gm_thrid encoding:NSUTF8StringEncoding];
+}
+
 - (NSUInteger)sequenceNumber {
     return mySequenceNumber;
 }

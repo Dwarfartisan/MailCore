@@ -189,6 +189,9 @@
 */
 - (NSUInteger)uid;
 
+- (NSString *)gmail_id;
+- (NSString *)gmail_thread_id;
+
 /**
  Returns the message sequence number, this number cannot be used across sessions
 */

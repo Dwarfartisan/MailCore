@@ -503,6 +503,18 @@ static const int MAX_PATH_SIZE = 1024;
             return nil;
         }
     }
+    
+    fetch_att = mailimap_fetch_att_new_gmail_message_id();
+    if (fetch_att == NULL) {
+        mailimap_fetch_type_free(fetch_type);
+        return nil;
+    }
+
+    fetch_att = mailimap_fetch_att_new_gmail_thread_id();
+    if (fetch_att == NULL) {
+        mailimap_fetch_type_free(fetch_type);
+        return nil;
+    }
 
     if (uidFetch) {
         r = mailimap_uid_fetch([self imapSession], set, fetch_type, &fetch_result);
@@ -825,6 +837,8 @@ int uid_list_to_env_list(clist * fetch_result, struct mailmessage_list ** result
     carray * tab;
     unsigned int i;
     mailmessage * msg;
+    char * gm_msgid;
+    char * gm_thrid;
 
     tab = carray_new(128);
     if (tab == NULL) {
@@ -855,6 +869,14 @@ int uid_list_to_env_list(clist * fetch_result, struct mailmessage_list ** result
                     case MAILIMAP_MSG_ATT_RFC822_SIZE:
                         size = item->att_data.att_static->att_data.att_rfc822_size;
                     break;
+                        
+                    case MAILIMAP_MSG_ATT_GM_MSGID:
+                        gm_msgid = item->att_data.att_static->att_data.att_gm_msgid;
+                    break;
+
+                    case MAILIMAP_MSG_ATT_GM_THRID:
+                        gm_thrid = item->att_data.att_static->att_data.att_gm_thrid;
+                    break;
                 }
                 break;
             }
@@ -871,7 +893,8 @@ int uid_list_to_env_list(clist * fetch_result, struct mailmessage_list ** result
             res = r;
             goto free_msg;
         }
-
+        msg->gm_msgid = gm_msgid;
+        msg->gm_thrid = gm_thrid;
         r = carray_add(tab, msg, NULL);
         if (r < 0) {
             res = MAIL_ERROR_MEMORY;
