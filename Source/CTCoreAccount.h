@@ -47,6 +47,9 @@
     NSError *lastError;
     NSString *pathDelimiter;
 }
+
+@property (assign, nonatomic) BOOL isGmail;
+
 /**
  If an error occurred (nil or return of NO) call this method to get the error
 */

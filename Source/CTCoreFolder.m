@@ -43,8 +43,8 @@
 
 //int imap_fetch_result_to_envelop_list(clist * fetch_result, struct mailmessage_list * env_list);
 //
-int uid_list_to_env_list(clist * fetch_result, struct mailmessage_list ** result,
-                        mailsession * session, mailmessage_driver * driver);
+int uid_list_to_env_list(clist * fetch_result, struct mailmessage_list ** result, carray ** thrid_storage,
+                         mailsession * session, mailmessage_driver * driver);
 
 @interface CTCoreFolder ()
 @end
@@ -446,10 +446,34 @@ static const int MAX_PATH_SIZE = 1024;
     struct mailimap_fetch_att * fetch_att;
     struct mailimap_fetch_type * fetch_type;
     struct mailmessage_list * env_list;
+    carray * thrid_storage;
 
     clist * fetch_result;
 
     fetch_type = mailimap_fetch_type_new_fetch_att_list_empty();
+    
+    // for gmail
+    if (myAccount.isGmail) {
+        //    fetch_att = mailimap_fetch_att_new_xgmmsgid();
+        //    r = mailimap_fetch_type_new_fetch_att_list_add(fetch_type, fetch_att);
+        //    if (r != MAILIMAP_NO_ERROR) {
+        //        mailimap_fetch_att_free(fetch_att);
+        //        mailimap_fetch_type_free(fetch_type);
+        //        self.lastError = MailCoreCreateErrorFromIMAPCode(r);
+        //        return nil;
+        //    }
+        
+        // Gmail fetch THRID
+        fetch_att = mailimap_fetch_att_new_xgmthrid();
+        r = mailimap_fetch_type_new_fetch_att_list_add(fetch_type, fetch_att);
+        if (r != MAILIMAP_NO_ERROR) {
+            mailimap_fetch_att_free(fetch_att);
+            mailimap_fetch_type_free(fetch_type);
+            self.lastError = MailCoreCreateErrorFromIMAPCode(r);
+            return nil;
+        }
+    }
+    
     // Always fetch UID
     fetch_att = mailimap_fetch_att_new_uid();
     r = mailimap_fetch_type_new_fetch_att_list_add(fetch_type, fetch_att);
@@ -518,7 +542,8 @@ static const int MAX_PATH_SIZE = 1024;
     mailimap_set_free(set);
 
     env_list = NULL;
-    r = uid_list_to_env_list(fetch_result, &env_list, [self folderSession], imap_message_driver);
+    thrid_storage = NULL;
+    r = uid_list_to_env_list(fetch_result, &env_list, &thrid_storage, [self folderSession], imap_message_driver);
     if (r != MAIL_NO_ERROR) {
         self.lastError = MailCoreCreateErrorFromIMAPCode(r);
         return nil;
@@ -604,6 +629,8 @@ static const int MAX_PATH_SIZE = 1024;
             }
         }
 
+        uint64_t thrId = carray_get(thrid_storage, i);
+        
         CTCoreMessage* msgObject = [[CTCoreMessage alloc] initWithMessageStruct:msg];
         msgObject.parentFolder = self;
         [msgObject setSequenceNumber:msg_att->att_number];
@@ -613,6 +640,8 @@ static const int MAX_PATH_SIZE = 1024;
         if (attrs & CTFetchAttrBodyStructure) {
             [msgObject setBodyStructure:new_body];
         }
+        msgObject.gmthrid = thrId;
+                
         [messages addObject:msgObject];
         [msgObject release];
 
@@ -816,17 +845,19 @@ static const int MAX_PATH_SIZE = 1024;
 
 /* From Libetpan source */
 //TODO Can these things be made public in libetpan?
-int uid_list_to_env_list(clist * fetch_result, struct mailmessage_list ** result,
+int uid_list_to_env_list(clist * fetch_result, struct mailmessage_list ** result, carray ** thrid_storage,
                         mailsession * session, mailmessage_driver * driver) {
     clistiter * cur;
     struct mailmessage_list * env_list;
     int r;
     int res;
     carray * tab;
+    carray * thr;
     unsigned int i;
     mailmessage * msg;
 
     tab = carray_new(128);
+    thr = carray_new(128);
     if (tab == NULL) {
         res = MAIL_ERROR_MEMORY;
         goto err;
@@ -837,10 +868,12 @@ int uid_list_to_env_list(clist * fetch_result, struct mailmessage_list ** result
         clistiter * item_cur;
         uint32_t uid;
         size_t size;
+        uint64_t thrId;
 
         msg_att = clist_content(cur);
         uid = 0;
         size = 0;
+        thrId = 0;
         for(item_cur = clist_begin(msg_att->att_list); item_cur != NULL; item_cur = clist_next(item_cur)) {
             struct mailimap_msg_att_item * item;
 
@@ -856,6 +889,13 @@ int uid_list_to_env_list(clist * fetch_result, struct mailmessage_list ** result
                         size = item->att_data.att_static->att_data.att_rfc822_size;
                     break;
                 }
+                break;
+                    
+                case MAILIMAP_MSG_ATT_ITEM_EXTENSION:
+                    if (item->att_data.att_extension_data->ext_extension->ext_id == MAILIMAP_EXTENSION_XGMTHRID) {
+                        uint64_t * data_msgid = item->att_data.att_extension_data->ext_data;
+                        thrId = * data_msgid;
+                    }
                 break;
             }
         }
@@ -877,6 +917,12 @@ int uid_list_to_env_list(clist * fetch_result, struct mailmessage_list ** result
             res = MAIL_ERROR_MEMORY;
             goto free_msg;
         }
+        
+        r = carray_add(thr, thrId, NULL);
+        if (r < 0) {
+            res = MAIL_ERROR_MEMORY;
+            goto free_msg;
+        }
     }
 
     env_list = mailmessage_list_new(tab);
@@ -886,6 +932,7 @@ int uid_list_to_env_list(clist * fetch_result, struct mailmessage_list ** result
     }
 
     * result = env_list;
+    * thrid_storage = thr;
 
     return MAIL_NO_ERROR;
 

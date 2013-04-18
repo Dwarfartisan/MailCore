@@ -48,6 +48,7 @@
         connected = NO;
         myStorage = mailstorage_new(NULL);
         assert(myStorage != NULL);
+        self.isGmail = NO;
     }
     return self;
 }

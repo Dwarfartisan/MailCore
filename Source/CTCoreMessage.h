@@ -62,6 +62,8 @@
 */
 @property(retain) CTMIME *mime;
 
+@property (assign) NSInteger gmthrid;
+
 /**
  Used to instantiate an empty message object.
 */
